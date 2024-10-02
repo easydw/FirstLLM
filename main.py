@@ -1,78 +1,60 @@
-# 下面代码可以应用于OpenAI,也可以应用与本地部署的Ollama中的模型.
-# 只需要更换以下api_key、api_url、api_model即可,其他代码不需要修改
-
-from openai import OpenAI
+import util
+from langchain.memory import ConversationBufferMemory
 import streamlit as st
 
-# 从环境变量中获取 API 密钥和自定义 base URL
-# OpenAI代理网站
-api_key = "sk-juMgledj3GhuZWdoFc28145bEd404b83Ba0d912f0780108b"
-api_url = "https://api.xty.app/v1"
-api_model = "gpt-3.5-turbo"
+def test():
+    # apikey = "sk-juMgledj3GhuZWdoFc28145bEd404b83Ba0d912f0780108b"
+    apikey = util.openfile("apikey.txt")
+    print(apikey)
+    memory = ConversationBufferMemory(return_messages=True)
+    # ret1 = get_chat_response("宇宙速度有几个,不要问我问题,直接回答", memory, api_key=apikey)
+    # print("第一个问题回答:")
+    # print(ret1)
+    # ret2 = get_chat_response("解释第二速度,不要问我问题,直接回答", memory, api_key=apikey)
+    # print("第二个问题回答:")
+    # print(ret2)
 
-# 创建 OpenAI 客户端实例
-client = OpenAI(api_key=api_key, base_url=api_url)
+    ret1 = util.get_chat_response("水缸中两个体积相同的球,A球漂浮,B球沉底,分析两个球浮力大小,不要问我问题,直接回答", memory, api_key=apikey)
+    print("第一个问题回答:")
+    print(ret1)
+    print("第二个问题回答:")
+    ret2 = util.get_chat_response("解释下B球的现象,不要问我问题,直接回答", memory, api_key=apikey)
+    print(ret2)
 
-def run_Api(promt):
-    completion = client.chat.completions.create(
-        model=api_model,
-        # messages=promt,
-        messages=[
-            {'role': 'system', 'content': '你是一位崔永元风格的脱口秀演员'},
-            {"role": "user", "content": promt}],
-        temperature=0.8,
-        top_p=0.8,
-        stream=False
-    )
-    return completion.choices[0].message.content
+# test()
+def newTalk():
+    if "memory" in st.session_state:
+        del st.session_state["memory"]
 
-# 调用方法: 实时现实
-def runapi_real(promt):
-    completion = client.chat.completions.create(
-        model=api_model,
-        messages=[
-            {'role': 'system', 'content': '你是一位崔永元风格的脱口秀演员'},
-            {"role": "user", "content": promt}],
-        temperature=0.8,
-        top_p=0.8,
-        stream=True
-    )
-    for chunk in completion:
-        if chunk.choices[0].delta.content is not None:
-            print(chunk.choices[0].delta.content, end="")
+st.title("仿真chatGPT")
+# 左侧
+with st.sidebar:
+    openai_api_key = st.text_input("请输入OpenAI API Key:", type="password")
+    st.markdown("[获取OpenAI API Key](https://api.xty.app/)")
+    st.button("新对话", on_click=newTalk)
+# 右侧
+# 初始化内存对象
+if "memory" not in st.session_state:
+    st.session_state["memory"] = ConversationBufferMemory()
+    st.session_state["messages"] = [{"role": "ai",
+                                    "content": "你好,我是AI助手,有什么可以帮您的?"}]
+# 展示message中的各项信息
+for message in st.session_state["messages"]:
+    st.chat_message(message["role"]).write(message["content"])
 
+# 接受用户输入
+prompt = st.chat_input()
+if prompt:
+    if not openai_api_key:
+        st.info("请输入您的OpenAI API Key")
+        st.stop()
+    st.session_state["messages"].append({"role": "human", "content": prompt})
+    st.chat_message("human").write(prompt)
 
-def mainchat(input):
-    user_input = input
-    print("输入完成，等待返回...")
-    # 执行方法
-    msgret = run_Api(user_input)
-    # 结果输出
-    print(msgret)
-    return msgret
-
-# 定义 mainchat 函数
-def mainchat(input):
-    user_input = input
-    retmsg = "输入完成，等待返回..."
-    # 执行方法
-    msgret = run_Api(user_input)
-    retmsg += f"\n{msgret}"
-    # 结果输出
-    print(msgret)
-    return retmsg
-
-# Streamlit 页面布局
-st.title("聊天应用")
-
-# 输入框
-user_input = st.text_input("请输入内容:")
-
-# 提交按钮
-if st.button("提交"):
-    # 调用 mainchat 方法
-    result = mainchat(user_input)
-    # 在页面上显示结果
-    st.write("返回结果:")
-    st.write(result)
-
+    # 调用和等待chatGPT的返回
+    with st.spinner("AI正在思考中, 请等待..."):
+        # st.balloons()
+        response = util.get_chat_response(prompt, st.session_state["memory"],
+                               api_key=openai_api_key)
+        st.session_state["messages"].append({"role": "ai", "content": response})
+        st.chat_message("ai").write(response)
